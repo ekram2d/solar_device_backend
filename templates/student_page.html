@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block contentSection %}
+<h2 class="text-2xl font-bold mb-4">All Students</h2>
+
+{% if students %}
+<form class="max-w-md mx-auto" method="GET" >  
+{% comment %} <form class="max-w-md mx-auto" method="GET" action="{% url 'filter_student' %}">    {% endcomment %}
+    <label for="default-search" class="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white">Search</label>
+    <div class="relative">
+        <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+            <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+            </svg>
+        </div>
+        <input  name="search" type="search" id="default-search" class="block w-full p-4 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Search Mockups, Logos..."/>
+        <button  onclick="handle_search(event)" type="submit" class="text-white absolute end-2.5 bottom-2.5 bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Search</button>
+    </div>
+</form>
+
+<div class="overflow-x-auto mb-10">
+    <table class="min-w-full bg-white border border-gray-200">
+        <thead class="bg-gray-100">
+            <tr>
+                <th class="px-4 py-2 border">Profile</th>
+                <th class="px-4 py-2 border">Name</th>
+                <th class="px-4 py-2 border">Roll No</th>
+                <th class="px-4 py-2 border">Department</th>
+                <th class="px-4 py-2 border">Address</th>
+                <th class="px-4 py-2 border">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="student_table">
+            {% for student in students %}
+            <tr id="row_{{ student.id }}" class="text-center border-t">
+                <td class="px-4 py-2 border">
+                    {% if student.profile_pic %}
+                    <img src="{{ student.profile_pic.url }}" alt="Profile" class="w-16 h-16 rounded-full mx-auto" />
+                    {% else %}
+                    <span class="text-gray-400">No Image</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 border">{{ student.user.first_name }} {{ student.user.last_name }}</td>
+                <td class="px-4 py-2 border">{{ student.roll_no }}</td>
+                <td class="px-4 py-2 border">{{ student.dept }}</td>
+                <td class="px-4 py-2 border">{{ student.address }}</td>
+                <td class="px-4 py-2 border space-x-2">
+                    <a href="{% url 'single_student' student.id %}" class="text-blue-600 hover:underline">Edit</a>
+                    <button onclick="DeleteStudent({{ student.id }})" class="text-red-600 hover:underline">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No students found.</p>
+{% endif %}
+
+<h2 class="text-xl font-semibold mb-4">Add New Student</h2>
+<form method="POST" action="{% if student %}{% url 'single_student' student.id %}{% else %}{% url 'student' %}{% endif %}" enctype="multipart/form-data" class="max-w-2xl mx-auto">
+    {% csrf_token %}
+{% comment %} 
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Username</label>
+        <input type="text" name="username" id="username" value="{{ student.user.username|default:'' }}" class="block w-full border rounded p-2" />
+    </div> {% endcomment %}
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">First Name</label>
+        <input type="text" name="firstname" id="firstname" value="{{ student.user.first_name|default:'' }}" class="block w-full border rounded p-2" />
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Last Name</label>
+        <input type="text" name="lastname" id="lastname" value="{{ student.user.last_name|default:'' }}" class="block w-full border rounded p-2" />
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Email</label>
+        <input type="email" name="email" id="email" value="{{ student.user.email|default:'' }}" class="block w-full border rounded p-2" />
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Password</label>
+        <input type="password" name="password" id="password" onkeyup="checkpassword(this.value)" class="block w-full border rounded p-2" />
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Phone</label>
+        <input type="text" name="phone" id="phone" maxlength="15" value="{{ student.phone|default:'' }}" class="block w-full border rounded p-2" />
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Roll Number</label>
+        <input type="text" name="roll_no" id="roll_no" maxlength="15" value="{{ student.roll_no|default:'' }}" class="block w-full border rounded p-2" />
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Department</label>
+        <select name="dept" id="dept" class="block w-full border rounded p-2">
+            <option value="" disabled {% if not student %}selected{% endif %}>Select Department</option>
+            <option value="CSE" {% if student.dept == 'CSE' %}selected{% endif %}>Computer Science & Engineering</option>
+            <option value="EEE" {% if student.dept == 'EEE' %}selected{% endif %}>Electrical & Electronic Engineering</option>
+            <option value="BBA" {% if student.dept == 'BBA' %}selected{% endif %}>Business Administration</option>
+            <option value="ENG" {% if student.dept == 'ENG' %}selected{% endif %}>English Literature</option>
+        </select>
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Address</label>
+        <textarea name="address" id="address" rows="3" class="block w-full border rounded p-2">{{ student.address|default:'' }}</textarea>
+    </div>
+
+    <div class="mb-5">
+        <label class="block text-sm font-medium">Profile Picture</label>
+        <input type="file" name="profile_pic" id="profile_pic" class="block w-full border rounded p-2 bg-gray-50" />
+    </div>
+
+    <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded shadow hover:bg-blue-700">
+        Submit
+    </button>
+</form>
+{% endblock %}
+
+{% block customJS %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+function checkpassword(value) {
+    let password = document.getElementById('password');
+    if (value.length < 6) {
+        password.classList.add('border-red-500');
+        password.classList.remove('border-gray-300');
+    } else {
+        password.classList.remove('border-red-500');
+        password.classList.add('border-gray-300');
+    }
+}
+
+function DeleteStudent(id) {
+    if (!confirm("Are you sure you want to delete this student?")) return;
+
+    $.ajax({
+        url: `/student-delete/${id}/`,
+        type: 'DELETE',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        success: function (response) {
+            if (response.status === 'success') {
+                document.getElementById(`row_${id}`).remove();
+                alert('Student deleted successfully!');
+            } else {
+                alert('Failed to delete student.');
+            }
+        },
+        error: function () {
+            alert('Error occurred while deleting student.');
+        }
+    });
+}
+</script>
+
+<script src="{% static 'app1/js/student.js' %}"></script>
+
+
+{% endblock %}
