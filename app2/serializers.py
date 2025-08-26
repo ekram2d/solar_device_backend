@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import CustomUser, Devices,CustomUser,BankInformation,BrandInformation,DeviceInformation,DeviceLocation
+from .models import CustomUser, Devices,CustomUser,BankInformation,BrandInformation,DeviceInformation,DeviceLocation,Inverter
 import uuid
 from rest_framework.response import Response
 class RegisterSerializer(serializers.ModelSerializer):
@@ -105,24 +105,31 @@ class BrandDevicesSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Serializer handles saving, no request here
         return BrandInformation.objects.create(**validated_data)
+class DeviceLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeviceLocation
+        fields='__all__'
+
+class InverterSerializer(serializers.ModelSerializer):
+    # brand_image=serializers.CharField(source='inverter.brand_image',read_only=True)
+    # brand_name=serializers.CharField(source='inverter.brand_name',read_only=True)
+    class Meta:
+        model=Inverter
+        fields='__all__'      
 class DeviceInformationSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(source="brand_info.brand_name", read_only=True)
     brand_image = serializers.ImageField(source="brand_info.brand_image", read_only=True)
+    first_name=serializers.CharField(source='user.first_name', read_only=True)
+    last_name=serializers.CharField(source='user.last_name', read_only=True)
     signature = serializers.SerializerMethodField()
-
+    locations = DeviceLocationSerializer(many=True, read_only=True)
+    inverter=InverterSerializer(many=True,read_only=True)
     class Meta:
         model = DeviceInformation
         fields = [
-            'id',
-            'user',
-            'custom_user',
-            'device_type',
-            'capacity',
-            'operations_date',
-            'brand_info',
-            'brand_name',
-            'brand_image',
-            'signature',
+            'id', 'user', 'custom_user', 'device_type', 'capacity',
+            'operations_date', 'brand_info', 'brand_name', 'brand_image',
+            'status', 'Check', 'signature','first_name','last_name','locations','inverter',
         ]
 
     def get_signature(self, obj):
@@ -131,7 +138,5 @@ class DeviceInformationSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.signature.url)
         return None
 
-class DeviceLocationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DeviceLocation
-        fields='__all__'
+
+    

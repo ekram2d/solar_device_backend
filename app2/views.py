@@ -10,8 +10,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from rest_framework import status, permissions
 from .login_serializers import LoginSerializer  # Better than HttpResponse for structured data
-from .serializers import RegisterSerializer, SolarDeviceSerializer, CustomUserSerializer,BankInformationSerializer,BrandDevicesSerializer,DeviceInformationSerializer,DeviceLocationSerializer
-from .models import CustomUser, Devices,BankInformation,BrandInformation,DeviceInformation,DeviceLocation
+from .serializers import RegisterSerializer, SolarDeviceSerializer, CustomUserSerializer,BankInformationSerializer,BrandDevicesSerializer,DeviceInformationSerializer,DeviceLocationSerializer,InverterSerializer
+from .models import CustomUser, Devices,BankInformation,BrandInformation,DeviceInformation,DeviceLocation,Inverter
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
@@ -169,6 +169,8 @@ class BrandInformationViewSet(viewsets.ModelViewSet):
 
 
 
+
+
 class DeviceInformationViewSet(viewsets.ModelViewSet):
     queryset = DeviceInformation.objects.all()
     serializer_class = DeviceInformationSerializer
@@ -176,39 +178,56 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        brand_id = self.kwargs.get("brand_id")  # must match <int:brand_id> in path
-
-        if brand_id:
-            queryset = queryset.filter(brand_info_id=brand_id)
+        custom_user = self.kwargs.get("custom_user")
+        if custom_user:
+            queryset = queryset.filter(custom_user=custom_user)
         return queryset
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        PATCH /device-info/<id>/ endpoint
+        Upload signature image only if it is currently null
+        """
+        instance = self.get_object()  # 👈 indented
+        print('instance', instance)
+
+        if instance.signature:
+            return Response(
+                {"error": "❌ Signature already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        signature_file = request.FILES.get("signature")
+        if not signature_file:
+            return Response(
+                {"error": "❌ No signature file provided."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        instance.signature = signature_file
+        instance.save()
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class InverterViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Inverter.objects.all()
+    serializer_class = InverterSerializer
+    
     def create(self, request, *args, **kwargs):
-        device_type = request.data.get("device_type")
-        user = request.data.get("user")
-        custom_user = request.data.get("custom_user")
-        brand_info = request.data.get("brand_info")
-
-        if not user or not custom_user or not brand_info:
-            return Response(
-                {"error": "❌ User or Custom User or Brand Info not found."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if DeviceInformation.objects.filter(device_type=device_type).exists():
-            return Response(
-                {"error": "❌ You already added a device with this type."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+    
 
 class DeviceLocationViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     queryset = DeviceLocation.objects.all()
     serializer_class = DeviceLocationSerializer
+    
     
     
     

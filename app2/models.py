@@ -79,14 +79,7 @@ class BrandInformation(models.Model):
     def __str__(self):
         return self.brand_name
     
-class DeviceLocation(models.Model):
-    address=models.CharField(max_length=255,null=True,blank=True)
-    country=models.CharField(max_length=100,null=True,blank=True)
-    province=models.CharField(max_length=100,null=True,blank=True)
-    postal_code=models.CharField(max_length=20,null=True,blank=True)
-    
-    def __str__(self):
-        return self.address
+
 DeviceInformation_Check=[
     ('confirm','Confirm'),
     ('pending','Pending'),
@@ -101,7 +94,6 @@ class DeviceInformation(models.Model):
     user=models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_info', null=True, blank=True)
     custom_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='device_info', null=True, blank=True)
     brand_info=models.ForeignKey(BrandInformation, on_delete=models.CASCADE, related_name='device_info', null=True, blank=True)
-    device_location=models.ForeignKey(DeviceLocation,on_delete=models.CASCADE,related_name='device_info',null=True,blank=True)
     device_type=models.CharField(max_length=50,null=True,blank=True)
     capacity=models.DecimalField(max_digits=10,decimal_places=5,null=True,blank=True)
     operations_date=models.DateField(null=True,blank=True)
@@ -110,7 +102,25 @@ class DeviceInformation(models.Model):
     signature=models.ImageField(upload_to='signatures/',null=True,blank=True)
 
     def __str__(self):
-        return f"{self.custom_user.username} - {self.device_type}"
+        return f"{self.custom_user}"
+
+class Inverter(models.Model):
+    device=models.ForeignKey(DeviceInformation,on_delete=models.CASCADE,related_name='inverters',null=True,blank=True)
+    serial_number=models.CharField(max_length=100,null=True,blank=True)
+    capacity=models.DecimalField(max_digits=10,decimal_places=5,null=True,blank=True)
+    
+    def __str__(self):
+        return f"{self.serial_number}"
+class DeviceLocation(models.Model):
+    device=models.ForeignKey(DeviceInformation,on_delete=models.CASCADE,related_name='locations',null=True,blank=True)
+    address=models.CharField(max_length=255,null=True,blank=True)
+    country=models.CharField(max_length=100,null=True,blank=True)
+    province=models.CharField(max_length=100,null=True,blank=True)
+    postal_code=models.CharField(max_length=20,null=True,blank=True)
+
+    
+    def __str__(self):
+        return f"{self.address}"
 
 
 # class UserSign(models.Model):
