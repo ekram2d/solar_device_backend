@@ -9,14 +9,12 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from rest_framework import status, permissions
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import BasePermission
 from .login_serializers import LoginSerializer  # Better than HttpResponse for structured data
 from .serializers import RegisterSerializer, SolarDeviceSerializer, CustomUserSerializer,BankInformationSerializer,BrandDevicesSerializer,DeviceInformationSerializer,DeviceLocationSerializer,InverterSerializer
 from .models import CustomUser, Devices,BankInformation,BrandInformation,DeviceInformation,DeviceLocation,Inverter
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.response import Response
-from rest_framework import status, permissions
-from rest_framework.views import APIView
+
 class RegisterViewSet(viewsets.ViewSet):
     # permission_classes = (AllowAny) 
 
@@ -62,9 +60,32 @@ class AuthViewSet(viewsets.ViewSet):
             }, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ✅ Custom permission
+class IsCustomAdmin(BasePermission):
+    """
+    Allow access only to users with user_type='admin'
+    """
+
+    def has_permission(self, request, view):
+        # print(request.user.user_type)
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # check related CustomUser model
+        if hasattr(request.user, "custom_user_app2"):
+            return request.user.custom_user_app2.user_type == "admin"
+        return False
+
+# ✅ ViewSet restricted to custom admins
 class CustomUserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCustomAdmin]
+
+
+
 
 # class SolarDeviceViewSet(viewsets.ViewSet):
 
@@ -95,7 +116,10 @@ class BankInformationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         custom_user = getattr(user, 'custom_user_app2', None)
-        if custom_user:
+        print(user.custom_user_app2.user_type)
+        if user.custom_user_app2.user_type=='admin':
+            return BankInformation.objects.all()
+        else:
             return BankInformation.objects.filter(custom_user=custom_user)
         return BankInformation.objects.none()
 
@@ -111,10 +135,8 @@ class BankInformationViewSet(viewsets.ModelViewSet):
 
         serializer.save(custom_user=custom_user)
 
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from .models import BrandInformation
-from .serializers import BrandDevicesSerializer
+
+
 
 class BrandInformationViewSet(viewsets.ModelViewSet):
     queryset = BrandInformation.objects.all()
@@ -175,41 +197,49 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
     queryset = DeviceInformation.objects.all()
     serializer_class = DeviceInformationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    
 
     def get_queryset(self):
         queryset = super().get_queryset()
         custom_user = self.kwargs.get("custom_user")
         if custom_user:
-            queryset = queryset.filter(custom_user=custom_user)
+            queryset = queryset.filter(custom_user=custom_user,Check='pending')
         return queryset
 
     def partial_update(self, request, *args, **kwargs):
         """
         PATCH /device-info/<id>/ endpoint
-        Upload signature image only if it is currently null
+        - If request contains 'Check', update Check status.
+        - If request contains 'signature', upload signature only if null.
         """
-        instance = self.get_object()  # 👈 indented
-        print('instance', instance)
+        instance = self.get_object()
 
-        if instance.signature:
-            return Response(
-                {"error": "❌ Signature already exists."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # ✅ Case 1: Confirm check status
+        check_status = request.data.get("Check")
+        if check_status:
+            instance.Check = check_status
+            instance.save()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
+        # ✅ Case 2: Upload signature
         signature_file = request.FILES.get("signature")
-        if not signature_file:
-            return Response(
-                {"error": "❌ No signature file provided."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if signature_file:
+            if instance.signature:
+                return Response(
+                    {"error": "❌ Signature already exists."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            instance.signature = signature_file
+            instance.save()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
-        instance.signature = signature_file
-        instance.save()
-
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
+        return Response(
+            {"error": "❌ No valid data provided."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class InverterViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]

@@ -9,7 +9,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
     first_name = serializers.CharField(max_length=30, required=True)
     last_name = serializers.CharField(max_length=30, required=True)
-
+    
     class Meta:
         model = CustomUser
         fields = '__all__'
@@ -61,8 +61,12 @@ class SolarDeviceSerializer(serializers.ModelSerializer):
         if Devices.objects.filter(user=user, name=name).exists():
             raise serializers.ValidationError("❌ You already added a device with this name.")
         return data
-        
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name']      
 class CustomUserSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True) 
     class Meta:
         model = CustomUser
         fields = '__all__'
@@ -90,17 +94,21 @@ class BankInformationSerializer(serializers.ModelSerializer):
 
 
 class BrandDevicesSerializer(serializers.ModelSerializer):
-    brand_image = serializers.SerializerMethodField()
+    brand_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = BrandInformation
-        fields = ['id', 'brand_name', 'brand_image']
+        fields = ['id', 'brand_name', 'brand_image', 'brand_image_url']
+        # extra_kwargs = {
+        #     "brand_image": {"write_only": True}  # allow upload but don’t expose raw path
+        # }
 
-    def get_brand_image(self, obj):
+    def get_brand_image_url(self, obj):
         request = self.context.get('request')
         if obj.brand_image and hasattr(obj.brand_image, 'url'):
             return request.build_absolute_uri(obj.brand_image.url)
         return None
+
 
     def create(self, validated_data):
         # Serializer handles saving, no request here
@@ -123,13 +131,13 @@ class DeviceInformationSerializer(serializers.ModelSerializer):
     last_name=serializers.CharField(source='user.last_name', read_only=True)
     signature = serializers.SerializerMethodField()
     locations = DeviceLocationSerializer(many=True, read_only=True)
-    inverter=InverterSerializer(many=True,read_only=True)
+    inverters=InverterSerializer(many=True,read_only=True)
     class Meta:
         model = DeviceInformation
         fields = [
             'id', 'user', 'custom_user', 'device_type', 'capacity',
             'operations_date', 'brand_info', 'brand_name', 'brand_image',
-            'status', 'Check', 'signature','first_name','last_name','locations','inverter',
+            'status', 'Check', 'signature','first_name','last_name','locations','inverters',
         ]
 
     def get_signature(self, obj):
